@@ -22,16 +22,30 @@
       version = "${baseVersion}-${self.shortRev or self.dirtyShortRev or "dirty"}";
     in
     {
-      packages = forAllSystems (pkgs: rec {
-        bruno = pkgs.callPackage ./nix/package.nix {
-          src = self;
-          inherit version baseVersion npmDepsHash;
-        };
-        default = bruno;
-      });
+      packages = forAllSystems (
+        pkgs:
+        let
+          npmDeps = pkgs.callPackage ./nix/npm-deps.nix {
+            src = self;
+            inherit npmDepsHash;
+          };
+        in
+        rec {
+          bruno = pkgs.callPackage ./nix/package.nix {
+            src = self;
+            inherit version baseVersion npmDeps;
+          };
+          bruno-cli = pkgs.callPackage ./nix/cli.nix {
+            src = self;
+            inherit version npmDeps;
+          };
+          default = bruno;
+        }
+      );
 
       overlays.default = final: _prev: {
         bruno = self.packages.${final.stdenv.hostPlatform.system}.bruno;
+        bruno-cli = self.packages.${final.stdenv.hostPlatform.system}.bruno-cli;
       };
 
       # Toolchain for `npm run dev` etc.
